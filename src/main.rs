@@ -9,7 +9,7 @@ fn main() {
     while let Some(arg) = args_iter.next() {
         args.push(arg);
     }
-    let mut bytes = Vec::<u8>::new();
+    let mut bytes: Vec<u8>;
     match args.get(0) {
         Some(a) => match a.as_str() {
             "--help" => {
@@ -64,6 +64,7 @@ fn main() {
     let _ = stdout.write(b"\x1b[H");
     let _ = stdout.flush();
     let mut buf = [0; 64];
+    let mut cursor_pos = [0; 64];
     let mut sum_bytes = 0;
     'outer: while sum_bytes < bytes.len() {
         let n_read_from_stdin = match stdin.read(&mut buf) {
@@ -73,17 +74,46 @@ fn main() {
                 return;
             }
         };
-        for idx in 0..n_read_from_stdin {
+        let mut idx = 0;
+        while idx < n_read_from_stdin {
             match buf[idx] {
-                8 => {
+                b'\x7f' => {
                     if sum_bytes > 0 {
                         sum_bytes -= 1;
-                        let _ = stdout.write(b"\x1b[1D");
-                        let _ = stdout.flush();
-                        continue;
                     }
+                    let _ = stdout.write(b"\x1b[6n");
+                    let _ = stdout.flush();
+                    let cursor_buf_len = match stdin.read(&mut cursor_pos) {
+                        Ok(n) => n,
+                        Err(_) => 0,
+                    };
+                    if matches!(
+                        cursor_pos[..cursor_buf_len][cursor_buf_len - 1 - 2..cursor_buf_len],
+                        [b';', b'1', b'R']
+                    ) {
+                        let _ = stdout.write(b"\x1b[1F");
+                        let _ = stdout.write(b"\x1b[999C");
+                    } else {
+                        let _ = stdout.write(b"\x1b[1D");
+                    }
+                    let _ = stdout.write(&bytes[sum_bytes..sum_bytes + 1]);
+                    if matches!(
+                        cursor_pos[..cursor_buf_len][cursor_buf_len - 1 - 2..cursor_buf_len],
+                        [b';', b'1', b'R']
+                    ) {
+                        let _ = stdout.write(b"\x1b[1F");
+                        let _ = stdout.write(b"\x1b[999C");
+                    } else {
+                        let _ = stdout.write(b"\x1b[1D");
+                    }
+                    let _ = stdout.flush();
+                    idx += 1;
+                    continue;
                 }
-                b'\n' => {}
+                b'\n' | 11 | 12 => {
+                    idx += 1;
+                    continue;
+                }
                 b'\x1b' => {
                     break 'outer;
                 }
@@ -91,12 +121,12 @@ fn main() {
             }
             if bytes[sum_bytes + idx] != buf[idx] {
                 let _ = stdout.write(b"\x1b[48;2;255;;m");
-            } else {
-                sum_bytes += 1;
             }
             let _ = stdout.write(&buf[idx..idx + 1]);
             let _ = stdout.write(b"\x1b[0m");
             let _ = stdout.flush();
+            idx += 1;
+            sum_bytes += 1;
         }
     }
     termios.c_lflag |= termios::ICANON;
@@ -109,4 +139,5 @@ fn main() {
         }
     }
     let _ = stdout.write(b"\x1b[2J");
+    let _ = stdout.write(b"\x1b[H");
 }
