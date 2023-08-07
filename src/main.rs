@@ -1,47 +1,50 @@
-use std::env;
-use std::io::Read;
-use std::io::Write;
+use iced::widget::{column, text, text_input};
+use iced::{Element, Sandbox, Settings};
 fn main() {
-    let mut args_iter = env::args();
-    let _ = args_iter.next();
-    let mut args = Vec::<String>::new();
-    while let Some(arg) = args_iter.next() {
-        args.push(arg);
+    let _ = TextDisplay::run(Settings::default());
+}
+
+#[derive(Debug, Clone)]
+enum Message {
+    Path(String),
+}
+
+struct TextDisplay {
+    text: String,
+    path_text: String,
+}
+
+impl Sandbox for TextDisplay {
+    type Message = Message;
+    fn new() -> Self {
+        Self {
+            text: String::new(),
+            path_text: String::new(),
+        }
     }
-    let mut bytes: Vec<u8>;
-    match args.get(0) {
-        Some(a) => match a.as_str() {
-            "--help" => {
-                println!(
-                    "{}",
-                    r#"
-    The program takes in one argument, which is the file to read from.
-    The requirements of the file is that it has to be ascii.
-    Ex:
-        typeracer <file>
-"#
-                );
-                return;
-            }
-            _ => match std::fs::read(a) {
-                Ok(bv) => bytes = bv,
+    fn title(&self) -> String {
+        String::from("typeracer")
+    }
+    fn update(&mut self, message: Self::Message) {
+        match message {
+            Message::Path(s) => match std::fs::read(s) {
+                Ok(b) => match String::from_utf8(b) {
+                    Ok(s) => self.text = s,
+                    Err(_) => {
+                        self.text = "file contents are not valid utf8".to_string();
+                    }
+                },
                 Err(_) => {
-                    eprintln!("reading {} failed", a);
-                    return;
+                    self.text = "file cannot be read".to_string();
                 }
             },
-        },
-        None => {
-            println!(
-                "{}",
-                r#"
-    The program takes in one argument, which is the file to read from.
-    The requirements of the file is that it has to be ascii.
-    Ex:
-        typeracer <file>
-"#
-            );
-            return;
         }
+    }
+    fn view(&self) -> Element<Message> {
+        column![
+            text(self.text.as_str()),
+            text_input("path to file", self.path_text.as_str()).on_input(|s| Message::Path(s))
+        ]
+        .into()
     }
 }
