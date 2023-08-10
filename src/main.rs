@@ -1,5 +1,5 @@
-use iced::widget::{column, text, text_input, scrollable};
-use iced::{widget, Renderer, Element, Sandbox, Settings};
+use iced::widget::{column, scrollable, text, text_input};
+use iced::{widget, Element, Renderer, Sandbox, Settings};
 mod typing_area;
 fn main() {
     let _ = TextDisplay::run(Settings::default());
@@ -47,7 +47,11 @@ impl Sandbox for TextDisplay {
     fn view(&self) -> Element<Message> {
         column![
             text_input("path to file", self.path_text.as_str()).on_input(|s| Message::Path(s)),
-            text(self.text.as_str()),
+            typing_area::TypingArea {
+                height: iced::Length::Fill,
+                width: iced::Length::Fill,
+                value: iced::widget::text_input::Value::new(self.text.as_str())
+            },
         ]
         .into()
     }
