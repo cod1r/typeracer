@@ -1,5 +1,6 @@
 use iced::widget::{column, scrollable, text, text_input};
 use iced::{widget, Element, Renderer, Sandbox, Settings};
+use iced_core::Widget;
 mod typing_area;
 fn main() {
     let _ = TextDisplay::run(Settings::default());
